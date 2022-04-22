@@ -118,29 +118,29 @@ namespace NCalc
         {
             LogicalExpression logicalExpression = null;
 
-            if (_cacheEnabled && !nocache)
-            {
-                try
-                {
-                    Rwl.AcquireReaderLock(Timeout.Infinite);
+            //if (_cacheEnabled && !nocache)
+            //{
+            //    try
+            //    {
+            //        Rwl.AcquireReaderLock(Timeout.Infinite);
 
-                    if (_compiledExpressions.ContainsKey(expression))
-                    {
-                        Trace.TraceInformation("Expression retrieved from cache: " + expression);
-                        var wr = _compiledExpressions[expression];
-                        logicalExpression = wr.Target as LogicalExpression;
+            //        if (_compiledExpressions.ContainsKey(expression))
+            //        {
+            //            Trace.TraceInformation("Expression retrieved from cache: " + expression);
+            //            var wr = _compiledExpressions[expression];
+            //            logicalExpression = wr.Target as LogicalExpression;
                     
-                        if (wr.IsAlive && logicalExpression != null)
-                        {
-                            return logicalExpression;
-                        }
-                    }
-                }
-                finally
-                {
-                    Rwl.ReleaseReaderLock();
-                }
-            }
+            //            if (wr.IsAlive && logicalExpression != null)
+            //            {
+            //                return logicalExpression;
+            //            }
+            //        }
+            //    }
+            //    finally
+            //    {
+            //        Rwl.ReleaseReaderLock();
+            //    }
+            //}
 
             if (logicalExpression == null)
             {
@@ -222,6 +222,8 @@ namespace NCalc
             var visitor = new EvaluationVisitor(Options, CultureInfo);
             visitor.EvaluateFunction += EvaluateFunction;
             visitor.EvaluateParameter += EvaluateParameter;
+            visitor.ResolveFunction += ResolveFunction;
+            visitor.ResolveParameter += ResolveParameter;
             visitor.Parameters = Parameters;
 
             // if array evaluation, execute the same expression multiple times
@@ -287,9 +289,11 @@ namespace NCalc
             return visitor.Result;
             
         }
-
+        
         public event EvaluateFunctionHandler EvaluateFunction;
         public event EvaluateParameterHandler EvaluateParameter;
+        public event ResolveFunctionHandler ResolveFunction;
+        public event ResolveParameterHandler ResolveParameter;
 
         private Dictionary<string, object> _parameters;
 

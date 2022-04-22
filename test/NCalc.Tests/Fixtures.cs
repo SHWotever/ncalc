@@ -20,7 +20,7 @@ namespace NCalc.Tests
         [TestMethod]
         public void ExpressionShouldEvaluate()
         {
-            var expressions = new []
+            var expressions = new[]
             {
                 "2 + 3 + 5",
                 "2 * 3 + 5",
@@ -79,7 +79,7 @@ namespace NCalc.Tests
                 new Expression("(3 + 2").Evaluate();
                 Assert.Fail();
             }
-            catch(EvaluationException e)
+            catch (EvaluationException e)
             {
                 Console.WriteLine("Error catched: " + e.Message);
             }
@@ -114,7 +114,7 @@ namespace NCalc.Tests
         {
             var e = new Expression("SecretOperation(3, 6)");
 
-            e.EvaluateFunction += delegate(string name, FunctionArgs args)
+            e.EvaluateFunction += delegate (string name, FunctionArgs args)
                 {
                     if (name == "SecretOperation")
                         args.Result = (int)args.Parameters[0].Evaluate() + (int)args.Parameters[1].Evaluate();
@@ -130,7 +130,7 @@ namespace NCalc.Tests
             e.Parameters["e"] = 3;
             e.Parameters["f"] = 1;
 
-            e.EvaluateFunction += delegate(string name, FunctionArgs args)
+            e.EvaluateFunction += delegate (string name, FunctionArgs args)
                 {
                     if (name == "SecretOperation")
                         args.Result = (int)args.Parameters[0].Evaluate() + (int)args.Parameters[1].Evaluate();
@@ -147,7 +147,7 @@ namespace NCalc.Tests
             e.Parameters["Pi Squared"] = new Expression("Pi * [Pi]");
             e.Parameters["X"] = 10;
 
-            e.EvaluateParameter += delegate(string name, ParameterArgs args)
+            e.EvaluateParameter += delegate (string name, ParameterArgs args)
                 {
                     if (name == "Pi")
                         args.Result = 3.14;
@@ -178,7 +178,7 @@ namespace NCalc.Tests
 
             Assert.AreEqual(1.99d, e.Evaluate());
 
-            e.EvaluateFunction += delegate(string name, FunctionArgs args)
+            e.EvaluateFunction += delegate (string name, FunctionArgs args)
             {
                 if (name == "Round")
                     args.Result = 3;
@@ -332,10 +332,10 @@ namespace NCalc.Tests
             Assert.AreEqual("1 + 2", new BinaryExpression(BinaryExpressionType.Plus, new ValueExpression(1), new ValueExpression(2)).ToString());
             Assert.AreEqual("1 * 2", new BinaryExpression(BinaryExpressionType.Times, new ValueExpression(1), new ValueExpression(2)).ToString());
 
-            Assert.AreEqual("-(True and False)",new UnaryExpression(UnaryExpressionType.Negate, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))).ToString());
-            Assert.AreEqual("!(True and False)",new UnaryExpression(UnaryExpressionType.Not, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))).ToString());
+            Assert.AreEqual("-(True and False)", new UnaryExpression(UnaryExpressionType.Negate, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))).ToString());
+            Assert.AreEqual("!(True and False)", new UnaryExpression(UnaryExpressionType.Not, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))).ToString());
 
-            Assert.AreEqual("test(True and False, -(True and False))",new Function(new Identifier("test"), new LogicalExpression[] { new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false)), new UnaryExpression(UnaryExpressionType.Negate, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))) }).ToString());
+            Assert.AreEqual("test(True and False, -(True and False))", new Function(new Identifier("test"), new LogicalExpression[] { new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false)), new UnaryExpression(UnaryExpressionType.Negate, new BinaryExpression(BinaryExpressionType.And, new ValueExpression(true), new ValueExpression(false))) }).ToString());
 
             Assert.AreEqual("True", new ValueExpression(true).ToString());
             Assert.AreEqual("False", new ValueExpression(false).ToString());
@@ -344,7 +344,7 @@ namespace NCalc.Tests
             Assert.AreEqual("'hello'", new ValueExpression("hello").ToString());
             Assert.AreEqual("#" + new DateTime(2009, 1, 1) + "#", new ValueExpression(new DateTime(2009, 1, 1)).ToString());
 
-            Assert.AreEqual("Sum(1 + 2)", new Function(new Identifier("Sum"), new [] { new BinaryExpression(BinaryExpressionType.Plus, new ValueExpression(1), new ValueExpression(2))}).ToString());
+            Assert.AreEqual("Sum(1 + 2)", new Function(new Identifier("Sum"), new[] { new BinaryExpression(BinaryExpressionType.Plus, new ValueExpression(1), new ValueExpression(2)) }).ToString());
         }
 
         [TestMethod]
@@ -458,7 +458,7 @@ namespace NCalc.Tests
         {
             var e = new Expression("Round(Pow([Pi], 2) + Pow([Pi], 2) + 10, 2)");
 
-            e.EvaluateParameter += delegate(string name, ParameterArgs arg)
+            e.EvaluateParameter += delegate (string name, ParameterArgs arg)
             {
                 if (name == "Pi")
                     arg.Result = 3.14;
@@ -468,32 +468,94 @@ namespace NCalc.Tests
         }
 
         [TestMethod]
+        public void ShouldResolveCustomParametersWhenNoSpecificParameterIsDefined()
+        {
+            var e = new Expression("Round(Pow([Pi], 2) + Pow([Pi], 2) + 10, 2)");
+
+            e.ResolveParameter += delegate (string name, ParameterResolveArgs rarg)
+            {
+                if (name == "Pi")
+                    rarg.Result = () => 3.14;
+            };
+
+            e.Evaluate();
+        }
+
+
+        [TestMethod]
         public void ShouldHandleCustomFunctionsInFunctions()
         {
             var e = new Expression("if(true, func1(x) + func2(func3(y)), 0)");
 
-            e.EvaluateFunction += delegate(string name, FunctionArgs arg)
+            e.EvaluateFunction += delegate (string name, FunctionArgs arg)
             {
                 switch (name)
                 {
-                    case "func1": arg.Result = 1;
+                    case "func1":
+                        arg.Result = 1;
                         break;
-                    case "func2": arg.Result = 2 * Convert.ToDouble(arg.Parameters[0].Evaluate());
+                    case "func2":
+                        arg.Result = 2 * Convert.ToDouble(arg.Parameters[0].Evaluate());
                         break;
-                    case "func3": arg.Result = 3 * Convert.ToDouble(arg.Parameters[0].Evaluate());
+                    case "func3":
+                        arg.Result = 3 * Convert.ToDouble(arg.Parameters[0].Evaluate());
                         break;
                 }
             };
 
-            e.EvaluateParameter += delegate(string name, ParameterArgs arg)
+            e.EvaluateParameter += delegate (string name, ParameterArgs arg)
             {
                 switch (name)
                 {
-                    case "x": arg.Result = 1;
+                    case "x":
+                        arg.Result = 1;
                         break;
-                    case "y": arg.Result = 2;
+                    case "y":
+                        arg.Result = 2;
                         break;
-                    case "z": arg.Result = 3;
+                    case "z":
+                        arg.Result = 3;
+                        break;
+                }
+            };
+
+            Assert.AreEqual(13d, e.Evaluate());
+        }
+
+
+        [TestMethod]
+        public void ShouldResolveCustomFunctionsInFunctions()
+        {
+            var e = new Expression("if(true, func7(x) + func8(func9(y)), 0)");
+
+            e.ResolveFunction += delegate (string name, int paramsCount, FunctionResolveArgs farg)
+            {
+                switch (name)
+                {
+                    case "func7":
+                        farg.Delegate = (arg) => arg.Result = 1;
+                        break;
+                    case "func8":
+                        farg.Delegate = (arg) => arg.Result = 2 * Convert.ToDouble(arg.Parameters[0].Evaluate());
+                        break;
+                    case "func9":
+                        farg.Delegate = (arg) => arg.Result = 3 * Convert.ToDouble(arg.Parameters[0].Evaluate());
+                        break;
+                }
+            };
+
+            e.EvaluateParameter += delegate (string name, ParameterArgs arg)
+            {
+                switch (name)
+                {
+                    case "x":
+                        arg.Result = 1;
+                        break;
+                    case "y":
+                        arg.Result = 2;
+                        break;
+                    case "z":
+                        arg.Result = 3;
                         break;
                 }
             };
@@ -517,7 +579,7 @@ namespace NCalc.Tests
         public void ShouldEvaluateArrayParameters()
         {
             var e = new Expression("x * x", EvaluateOptions.IterateParameters);
-            e.Parameters["x"] = new [] { 0, 1, 2, 3, 4 };
+            e.Parameters["x"] = new[] { 0, 1, 2, 3, 4 };
 
             var result = (IList)e.Evaluate();
 
@@ -533,7 +595,7 @@ namespace NCalc.Tests
         {
             var e = new Expression("SecretOperation(3, 6)");
 
-            e.EvaluateFunction += delegate(string name, FunctionArgs args)
+            e.EvaluateFunction += delegate (string name, FunctionArgs args)
             {
                 Assert.IsFalse(args.HasResult);
                 if (name == "SecretOperation")
@@ -549,7 +611,7 @@ namespace NCalc.Tests
         {
             var e = new Expression("x");
 
-            e.EvaluateParameter += delegate(string name, ParameterArgs args)
+            e.EvaluateParameter += delegate (string name, ParameterArgs args)
             {
                 Assert.IsFalse(args.HasResult);
                 if (name == "x")
@@ -707,7 +769,7 @@ namespace NCalc.Tests
             }
             catch (EvaluationException e)
             {
-               Assert.AreEqual("line 1:8 no viable alternative at character '\"'", e.Message);
+                Assert.AreEqual("line 1:8 no viable alternative at character '\"'", e.Message);
             }
         }
 

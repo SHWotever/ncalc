@@ -1,3 +1,5 @@
+using System;
+
 namespace NCalc.Domain
 {
     public class Identifier : LogicalExpression
@@ -9,6 +11,8 @@ namespace NCalc.Domain
 
         public string Name { get; set; }
 
+        public Func<object> ValueDelegate { get; set; }
+        public bool Resolved { get; internal set; }
 
         public override void Accept(LogicalExpressionVisitor visitor)
         {

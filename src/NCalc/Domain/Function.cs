@@ -1,3 +1,5 @@
+using System;
+
 namespace NCalc.Domain
 {
     public class Function : LogicalExpression
@@ -16,5 +18,11 @@ namespace NCalc.Domain
         {
             visitor.Visit(this);
         }
-    }
+
+        internal Action<FunctionArgs> DelegateFunction { get; set; }
+
+        internal Action<FunctionArgs> InternalDelegateFunction { get; set; }
+
+        internal bool Resolved { get; set; }
+}
 }

@@ -71,7 +71,7 @@ namespace NCalc.Domain
             {
                 mpt = GetMostPreciseType(a.GetType(), b?.GetType());
             }
-            
+
             return Comparer.Default.Compare(Convert.ChangeType(a, mpt, _cultureInfo), Convert.ChangeType(b, mpt));
         }
 
@@ -253,22 +253,40 @@ namespace NCalc.Domain
         public override void Visit(Function function)
         {
             var args = new FunctionArgs
-                           {
-                               Parameters = new Expression[function.Expressions.Length]
-                           };
+            {
+                Parameters = new Expression[function.Expressions.Length]
+            };
 
             // Don't call parameters right now, instead let the function do it as needed.
             // Some parameters shouldn't be called, for instance, in a if(), the "not" value might be a division by zero
             // Evaluating every value could produce unexpected behaviour
-            for (int i = 0; i < function.Expressions.Length; i++ )
+            for (int i = 0; i < function.Expressions.Length; i++)
             {
-                args.Parameters[i] =  new Expression(function.Expressions[i], _options, _cultureInfo);
+                args.Parameters[i] = new Expression(function.Expressions[i], _options, _cultureInfo);
                 args.Parameters[i].EvaluateFunction += EvaluateFunction;
                 args.Parameters[i].EvaluateParameter += EvaluateParameter;
+                args.Parameters[i].ResolveFunction += ResolveFunction;
+                args.Parameters[i].ResolveParameter += ResolveParameter;
 
                 // Assign the parameters of the Expression to the arguments so that custom Functions and Parameters can use them
                 args.Parameters[i].Parameters = Parameters;
-            }            
+            }
+
+
+            if (!function.Resolved)
+            {
+                var resolveDelegateArg = new FunctionResolveArgs();
+                OnResolveFunction(IgnoreCase ? function.Identifier.Name.ToLower() : function.Identifier.Name, args.Parameters.Length, resolveDelegateArg);
+                function.DelegateFunction = resolveDelegateArg.Delegate;
+                function.Resolved = true;
+            }
+
+            if (function.DelegateFunction != null)
+            {
+                function.DelegateFunction(args);
+                Result = args.Result;
+                return;
+            }
 
             // Calls external implementation
             OnEvaluateFunction(IgnoreCase ? function.Identifier.Name.ToLower() : function.Identifier.Name, args);
@@ -280,6 +298,25 @@ namespace NCalc.Domain
                 return;
             }
 
+            // Try to find an internal function
+            var resolveInternalDelegateArg = new FunctionResolveArgs();
+
+            if (function.InternalDelegateFunction == null)
+            {
+                ResolveInternalFunction(function, resolveInternalDelegateArg);
+                function.InternalDelegateFunction = resolveInternalDelegateArg.Delegate;
+            }
+
+            function.InternalDelegateFunction(args);
+            Result = args.Result;
+
+            return;
+
+        }
+
+        private void ResolveInternalFunction(Function function, FunctionResolveArgs fargs)
+        {
+
             switch (function.Identifier.Name.ToLower())
             {
                 #region Abs
@@ -290,8 +327,8 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Abs() takes exactly 1 argument");
 
-                    Result = Math.Abs(Convert.ToDecimal(
-                        Evaluate(function.Expressions[0]), _cultureInfo)
+                    fargs.Delegate = (args) => args.Result = Math.Abs(Convert.ToDecimal(
+                        Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo)
                         );
 
                     break;
@@ -306,7 +343,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Acos() takes exactly 1 argument");
 
-                    Result = Math.Acos(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Acos(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -320,7 +357,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Asin() takes exactly 1 argument");
 
-                    Result = Math.Asin(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Asin(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -334,7 +371,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Atan() takes exactly 1 argument");
 
-                    Result = Math.Atan(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Atan(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -348,7 +385,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Ceiling() takes exactly 1 argument");
 
-                    Result = Math.Ceiling(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Ceiling(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -363,7 +400,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Cos() takes exactly 1 argument");
 
-                    Result = Math.Cos(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Cos(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -377,7 +414,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Exp() takes exactly 1 argument");
 
-                    Result = Math.Exp(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Exp(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -391,7 +428,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Floor() takes exactly 1 argument");
 
-                    Result = Math.Floor(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Floor(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -405,7 +442,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 2)
                         throw new ArgumentException("IEEERemainder() takes exactly 2 arguments");
 
-                    Result = Math.IEEERemainder(Convert.ToDouble(Evaluate(function.Expressions[0])), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.IEEERemainder(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression)), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -419,7 +456,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Ln() takes exactly 1 argument");
 
-                    Result = Math.Log(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Log(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -433,7 +470,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 2)
                         throw new ArgumentException("Log() takes exactly 2 arguments");
 
-                    Result = Math.Log(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Log(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -447,7 +484,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Log10() takes exactly 1 argument");
 
-                    Result = Math.Log10(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Log10(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -461,7 +498,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 2)
                         throw new ArgumentException("Pow() takes exactly 2 arguments");
 
-                    Result = Math.Pow(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Pow(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -477,7 +514,7 @@ namespace NCalc.Domain
 
                     MidpointRounding rounding = (_options & EvaluateOptions.RoundAwayFromZero) == EvaluateOptions.RoundAwayFromZero ? MidpointRounding.AwayFromZero : MidpointRounding.ToEven;
 
-                    Result = Math.Round(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToInt16(Evaluate(function.Expressions[1]), _cultureInfo), rounding);
+                    fargs.Delegate = (args) => args.Result = Math.Round(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToInt16(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo), rounding);
 
                     break;
 
@@ -491,7 +528,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Sign() takes exactly 1 argument");
 
-                    Result = Math.Sign(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Sign(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -505,7 +542,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Sin() takes exactly 1 argument");
 
-                    Result = Math.Sin(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Sin(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -519,7 +556,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Sqrt() takes exactly 1 argument");
 
-                    Result = Math.Sqrt(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Sqrt(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -533,7 +570,7 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Tan() takes exactly 1 argument");
 
-                    Result = Math.Tan(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Tan(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
@@ -547,12 +584,12 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 1)
                         throw new ArgumentException("Truncate() takes exactly 1 argument");
 
-                    Result = Math.Truncate(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
+                    fargs.Delegate = (args) => args.Result = Math.Truncate(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
 
                     break;
 
                 #endregion
-                
+
                 #region Max
                 case "max":
 
@@ -561,10 +598,13 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 2)
                         throw new ArgumentException("Max() takes exactly 2 arguments");
 
-                    object maxleft = Evaluate(function.Expressions[0]);
-                    object maxright = Evaluate(function.Expressions[1]);
+                    fargs.Delegate = (args) =>
+                    {
+                        object maxleft = Evaluate(args.Parameters[0].ParsedExpression);
+                        object maxright = Evaluate(args.Parameters[1].ParsedExpression);
 
-                    Result = Numbers.Max(maxleft, maxright);
+                        args.Result = Numbers.Max(maxleft, maxright);
+                    };
                     break;
 
                 #endregion
@@ -577,10 +617,13 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 2)
                         throw new ArgumentException("Min() takes exactly 2 arguments");
 
-                    object minleft = Evaluate(function.Expressions[0]);
-                    object minright = Evaluate(function.Expressions[1]);
+                    fargs.Delegate = (args) =>
+                    {
+                        object minleft = Evaluate(args.Parameters[0].ParsedExpression);
+                        object minright = Evaluate(args.Parameters[1].ParsedExpression);
 
-                    Result = Numbers.Min(minleft, minright);
+                        args.Result = Numbers.Min(minleft, minright);
+                    };
                     break;
 
                 #endregion
@@ -593,9 +636,11 @@ namespace NCalc.Domain
                     if (function.Expressions.Length != 3)
                         throw new ArgumentException("if() takes exactly 3 arguments");
 
-                    bool cond = Convert.ToBoolean(Evaluate(function.Expressions[0]), _cultureInfo);
-
-                    Result = cond ? Evaluate(function.Expressions[1]) : Evaluate(function.Expressions[2]);
+                    fargs.Delegate = (args) =>
+                    {
+                        bool cond = Convert.ToBoolean(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo);
+                        args.Result = cond ? Evaluate(args.Parameters[1].ParsedExpression) : Evaluate(args.Parameters[2].ParsedExpression);
+                    };
                     break;
 
                 #endregion
@@ -608,28 +653,31 @@ namespace NCalc.Domain
                     if (function.Expressions.Length < 2)
                         throw new ArgumentException("in() takes at least 2 arguments");
 
-                    object parameter = Evaluate(function.Expressions[0]);
-
-                    bool evaluation = false;
-
-                    // Goes through any values, and stop whe one is found
-                    for (int i = 1; i < function.Expressions.Length; i++)
+                    fargs.Delegate = (args) =>
                     {
-                        object argument = Evaluate(function.Expressions[i]);
-                        if (CompareUsingMostPreciseType(parameter, argument) == 0)
-                        {
-                            evaluation = true;
-                            break;
-                        }
-                    }
+                        object parameter = Evaluate(args.Parameters[0].ParsedExpression);
 
-                    Result = evaluation;
+                        bool evaluation = false;
+
+                        // Goes through any values, and stop whe one is found
+                        for (int i = 1; i < function.Expressions.Length; i++)
+                        {
+                            object argument = Evaluate(args.Parameters[i].ParsedExpression);
+                            if (CompareUsingMostPreciseType(parameter, argument) == 0)
+                            {
+                                evaluation = true;
+                                break;
+                            }
+                        }
+
+                        args.Result = evaluation;
+                    };
                     break;
 
                 #endregion
 
                 default:
-                    throw new ArgumentException("Function not found", 
+                    throw new ArgumentException("Function not found",
                         function.Identifier.Name);
             }
         }
@@ -653,11 +701,18 @@ namespace NCalc.Domain
         }
 
         public event EvaluateFunctionHandler EvaluateFunction;
+        public event ResolveFunctionHandler ResolveFunction;
 
         private void OnEvaluateFunction(string name, FunctionArgs args)
         {
             if (EvaluateFunction != null)
                 EvaluateFunction(name, args);
+        }
+
+        private void OnResolveFunction(string name, int parameterCount, FunctionResolveArgs args)
+        {
+            if (ResolveFunction != null)
+                ResolveFunction(name, parameterCount, args);
         }
 
         public override void Visit(Identifier parameter)
@@ -679,6 +734,9 @@ namespace NCalc.Domain
                     expression.EvaluateFunction += EvaluateFunction;
                     expression.EvaluateParameter += EvaluateParameter;
 
+                    expression.ResolveFunction += ResolveFunction;
+                    expression.ResolveParameter += ResolveParameter;
+
                     Result = ((Expression)Parameters[parameter.Name]).Evaluate();
                 }
                 else
@@ -686,6 +744,22 @@ namespace NCalc.Domain
             }
             else
             {
+
+                if(parameter.Resolved == false)
+                {
+                    var resolveArgs = new ParameterResolveArgs();
+
+                    OnResolveParameter(parameter.Name, resolveArgs);
+                    parameter.ValueDelegate = resolveArgs.Result;
+                    parameter.Resolved = true;
+                }
+
+                if (parameter.ValueDelegate != null)
+                {
+                    Result = parameter.ValueDelegate();
+                    return;
+                }
+
                 // The parameter should be defined in a call back method
                 var args = new ParameterArgs();
 
@@ -700,11 +774,18 @@ namespace NCalc.Domain
         }
 
         public event EvaluateParameterHandler EvaluateParameter;
+        public event ResolveParameterHandler ResolveParameter;
 
         private void OnEvaluateParameter(string name, ParameterArgs args)
         {
             if (EvaluateParameter != null)
                 EvaluateParameter(name, args);
+        }
+
+        private void OnResolveParameter(string name, ParameterResolveArgs args)
+        {
+            if (ResolveParameter != null)
+                ResolveParameter(name, args);
         }
 
         public Dictionary<string, object> Parameters { get; set; }
