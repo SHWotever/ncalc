@@ -231,7 +231,7 @@ namespace NCalc.Domain
 
         public override string ToString()
         {
-            if (serialization != null)
+            if (serialization == null)
             {
                 SerializationVisitor serializer = new SerializationVisitor();
                 this.Accept(serializer);
