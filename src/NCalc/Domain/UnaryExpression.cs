@@ -1,5 +1,6 @@
 namespace NCalc.Domain
 {
+    [System.Serializable]
     public class UnaryExpression : LogicalExpression
     {
         public UnaryExpression(UnaryExpressionType type, LogicalExpression expression)

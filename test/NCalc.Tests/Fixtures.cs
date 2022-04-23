@@ -178,6 +178,7 @@ namespace NCalc.Tests
 
             Assert.AreEqual(1.99d, e.Evaluate());
 
+            e = new Expression("Round(1.99, 2)");
             e.EvaluateFunction += delegate (string name, FunctionArgs args)
             {
                 if (name == "Round")

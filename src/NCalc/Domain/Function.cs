@@ -2,6 +2,7 @@ using System;
 
 namespace NCalc.Domain
 {
+    [Serializable]
     public class Function : LogicalExpression
     {
         public Function(Identifier identifier, LogicalExpression[] expressions)
@@ -19,10 +20,13 @@ namespace NCalc.Domain
             visitor.Visit(this);
         }
 
-        internal Action<FunctionArgs> DelegateFunction { get; set; }
+        [NonSerialized]
+        internal Action<FunctionArgs> DelegateFunction;
 
-        internal Action<FunctionArgs> InternalDelegateFunction { get; set; }
+        [NonSerialized]
+        internal Func<Function, object> InternalDelegateFunction;
 
-        internal bool Resolved { get; set; }
-}
+        [NonSerialized]
+        internal bool Resolved;
+    }
 }

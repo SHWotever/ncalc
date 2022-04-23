@@ -6,6 +6,8 @@ using Antlr.Runtime;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
 
 namespace NCalc
 {
@@ -113,34 +115,55 @@ namespace NCalc
         }
 
         #endregion
+        private static T DeepClone<T>(T obj)
+        {
+            using (var ms = new MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+                formatter.Serialize(ms, obj);
+                ms.Position = 0;
+
+                return (T)formatter.Deserialize(ms);
+            }
+        }
 
         public static LogicalExpression Compile(string expression, bool nocache)
         {
             LogicalExpression logicalExpression = null;
 
-            //if (_cacheEnabled && !nocache)
-            //{
-            //    try
-            //    {
-            //        Rwl.AcquireReaderLock(Timeout.Infinite);
+            if (_cacheEnabled && !nocache)
+            {
+                try
+                {
+                    Rwl.AcquireReaderLock(Timeout.Infinite);
 
-            //        if (_compiledExpressions.ContainsKey(expression))
-            //        {
-            //            Trace.TraceInformation("Expression retrieved from cache: " + expression);
-            //            var wr = _compiledExpressions[expression];
-            //            logicalExpression = wr.Target as LogicalExpression;
-                    
-            //            if (wr.IsAlive && logicalExpression != null)
-            //            {
-            //                return logicalExpression;
-            //            }
-            //        }
-            //    }
-            //    finally
-            //    {
-            //        Rwl.ReleaseReaderLock();
-            //    }
-            //}
+                    if (_compiledExpressions.ContainsKey(expression))
+                    {
+                        //Trace.TraceInformation("Expression retrieved from cache: " + expression);
+                        var wr = _compiledExpressions[expression];
+                        var tmp = wr.Target as LogicalExpression;
+                  
+                        if (wr.IsAlive && tmp != null)
+                        {
+                            try
+                            {
+                                var res =  DeepClone(tmp);
+                                res.CloneSource = tmp;
+                                logicalExpression = res;
+                                nocache = true;
+                            }
+                            catch
+                            {
+                                throw;
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    Rwl.ReleaseReaderLock();
+                }
+            }
 
             if (logicalExpression == null)
             {

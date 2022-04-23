@@ -2,6 +2,7 @@ using System;
 
 namespace NCalc.Domain
 {
+    [Serializable]
     public class Identifier : LogicalExpression
     {
         public Identifier(string name)
@@ -11,8 +12,8 @@ namespace NCalc.Domain
 
         public string Name { get; set; }
 
-        public Func<object> ValueDelegate { get; set; }
-        public bool Resolved { get; internal set; }
+        [NonSerialized]
+        public Func<object> ValueDelegate;
 
         public override void Accept(LogicalExpressionVisitor visitor)
         {

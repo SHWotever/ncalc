@@ -2,6 +2,7 @@ using System;
 
 namespace NCalc.Domain
 {
+    [System.Serializable]
     public class ValueExpression : LogicalExpression
     {
         public ValueExpression(object value, ValueType type)

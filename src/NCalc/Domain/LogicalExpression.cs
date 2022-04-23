@@ -1,12 +1,15 @@
 using System;
-using Antlr.Runtime.Tree;
 using System.Text;
 
 namespace NCalc.Domain
 {
+    [Serializable]
     public abstract class LogicalExpression
     {
-        const char BS = '\\';
+        private const char BS = '\\';
+
+        [NonSerialized]
+        internal LogicalExpression CloneSource;
 
         private static string extractString(string text)
         {
@@ -25,6 +28,7 @@ namespace NCalc.Domain
                         char unicodeChar = Encoding.Unicode.GetChars(new byte[] { System.Convert.ToByte(hcode, 16), System.Convert.ToByte(lcode, 16) })[0];
                         sb.Remove(slashIndex, 6).Insert(slashIndex, unicodeChar);
                         break;
+
                     case 'n': sb.Remove(slashIndex, 2).Insert(slashIndex, '\n'); break;
                     case 'r': sb.Remove(slashIndex, 2).Insert(slashIndex, '\r'); break;
                     case 't': sb.Remove(slashIndex, 2).Insert(slashIndex, '\t'); break;
@@ -34,7 +38,6 @@ namespace NCalc.Domain
                 }
 
                 startIndex = slashIndex + 1;
-
             }
 
             sb.Remove(0, 1);
@@ -223,12 +226,19 @@ namespace NCalc.Domain
             return new BinaryExpression(BinaryExpressionType.RightShift, this, new ValueExpression(operand));
         }
 
+        [NonSerialized]
+        private string serialization = null;
+
         public override string ToString()
         {
-            SerializationVisitor serializer = new SerializationVisitor();
-            this.Accept(serializer);
+            if (serialization != null)
+            {
+                SerializationVisitor serializer = new SerializationVisitor();
+                this.Accept(serializer);
 
-            return serializer.Result.ToString().TrimEnd(' ');
+                serialization = serializer.Result.ToString().TrimEnd(' ');
+            }
+            return serialization;
         }
 
         public virtual void Accept(LogicalExpressionVisitor visitor)

@@ -1,5 +1,8 @@
-﻿namespace NCalc.Domain
+﻿using System;
+
+namespace NCalc.Domain
 {
+    [Serializable]
     public class TernaryExpression : LogicalExpression
     {
         public TernaryExpression(LogicalExpression leftExpression, LogicalExpression middleExpression, LogicalExpression rightExpression)

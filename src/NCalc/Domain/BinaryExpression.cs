@@ -1,5 +1,8 @@
+using System;
+
 namespace NCalc.Domain
 {
+    [System.Serializable]
     public class BinaryExpression : LogicalExpression
     {
         public BinaryExpression(BinaryExpressionType type, LogicalExpression leftExpression, LogicalExpression rightExpression)
@@ -14,6 +17,9 @@ namespace NCalc.Domain
         public LogicalExpression RightExpression { get; set; }
 
         public BinaryExpressionType Type { get; set; }
+
+        [NonSerialized]
+        internal Func<Func<object>, Func<object>, object> BinaryDelegate;
 
         public override void Accept(LogicalExpressionVisitor visitor)
         {

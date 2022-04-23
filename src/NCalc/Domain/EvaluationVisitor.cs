@@ -7,12 +7,11 @@ namespace NCalc.Domain
 {
     public class EvaluationVisitor : LogicalExpressionVisitor
     {
-        private delegate T Func<T>();
-
         private readonly EvaluateOptions _options = EvaluateOptions.None;
         private readonly CultureInfo _cultureInfo;
 
-        private bool IgnoreCase { get { return (_options & EvaluateOptions.IgnoreCase) == EvaluateOptions.IgnoreCase; } }
+        private bool IgnoreCase
+        { get { return (_options & EvaluateOptions.IgnoreCase) == EvaluateOptions.IgnoreCase; } }
 
         public EvaluationVisitor(EvaluateOptions options) : this(options, CultureInfo.CurrentCulture)
         {
@@ -103,14 +102,14 @@ namespace NCalc.Domain
             // simulate Lazy<Func<>> behavior for late evaluation
             object leftValue = null;
             Func<object> left = () =>
-                                 {
-                                     if (leftValue == null)
-                                     {
-                                         expression.LeftExpression.Accept(this);
-                                         leftValue = Result;
-                                     }
-                                     return leftValue;
-                                 };
+            {
+                if (leftValue == null)
+                {
+                    expression.LeftExpression.Accept(this);
+                    leftValue = Result;
+                }
+                return leftValue;
+            };
 
             // simulate Lazy<Func<>> behavior for late evaluations
             object rightValue = null;
@@ -124,99 +123,116 @@ namespace NCalc.Domain
                 return rightValue;
             };
 
+            if (expression.BinaryDelegate == null)
+            {
+                expression.BinaryDelegate = GetBinaryDelegate(expression);
+            }
+
+            Result = expression.BinaryDelegate(left, right);
+        }
+
+        private System.Func<Func<object>, Func<object>, object> GetBinaryDelegate(BinaryExpression expression)
+        {
             switch (expression.Type)
             {
                 case BinaryExpressionType.And:
-                    Result = Convert.ToBoolean(left(), _cultureInfo) && Convert.ToBoolean(right(), _cultureInfo);
+                    return (left, right) => Convert.ToBoolean(left(), _cultureInfo) && Convert.ToBoolean(right(), _cultureInfo);
                     break;
 
                 case BinaryExpressionType.Or:
-                    Result = Convert.ToBoolean(left(), _cultureInfo) || Convert.ToBoolean(right(), _cultureInfo);
+                    return (left, right) => Convert.ToBoolean(left(), _cultureInfo) || Convert.ToBoolean(right(), _cultureInfo);
                     break;
 
                 case BinaryExpressionType.Div:
-                    Result = IsReal(left()) || IsReal(right())
+                    return (left, right) => IsReal(left()) || IsReal(right())
                                  ? Numbers.Divide(left(), right())
                                  : Numbers.Divide(Convert.ToDouble(left(), _cultureInfo), right());
                     break;
 
                 case BinaryExpressionType.Equal:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) == 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) == 0;
                     break;
 
                 case BinaryExpressionType.Greater:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) > 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) > 0;
                     break;
 
                 case BinaryExpressionType.GreaterOrEqual:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) >= 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) >= 0;
                     break;
 
                 case BinaryExpressionType.Lesser:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) < 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) < 0;
                     break;
 
                 case BinaryExpressionType.LesserOrEqual:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) <= 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) <= 0;
                     break;
 
                 case BinaryExpressionType.Minus:
-                    Result = Numbers.Soustract(left(), right());
+                    return (left, right) => Numbers.Soustract(left(), right());
                     break;
 
                 case BinaryExpressionType.Modulo:
-                    Result = Numbers.Modulo(left(), right());
+                    return (left, right) => Numbers.Modulo(left(), right());
                     break;
 
                 case BinaryExpressionType.NotEqual:
                     // Use the type of the left operand to make the comparison
-                    Result = CompareUsingMostPreciseType(left(), right()) != 0;
+                    return (left, right) => CompareUsingMostPreciseType(left(), right()) != 0;
                     break;
 
                 case BinaryExpressionType.Plus:
-                    if (left() is string)
+                    return (left, right) =>
                     {
-                        Result = String.Concat(left(), right());
-                    }
-                    else
-                    {
-                        Result = Numbers.Add(left(), right());
-                    }
+                        var l = left();
+                        if (l is string)
+                        {
+                            return String.Concat(l, right());
+                        }
+                        else
+                        {
+                            return Numbers.Add(l, right());
+                        }
+                    };
 
                     break;
 
                 case BinaryExpressionType.Times:
-                    Result = Numbers.Multiply(left(), right());
+                    return (left, right) => Numbers.Multiply(left(), right());
                     break;
 
                 case BinaryExpressionType.BitwiseAnd:
-                    Result = Convert.ToUInt16(left(), _cultureInfo) & Convert.ToUInt16(right());
+                    return (left, right) => Convert.ToUInt16(left(), _cultureInfo) & Convert.ToUInt16(right());
                     break;
 
                 case BinaryExpressionType.BitwiseOr:
-                    Result = Convert.ToUInt16(left(), _cultureInfo) | Convert.ToUInt16(right());
+                    return (left, right) => Convert.ToUInt16(left(), _cultureInfo) | Convert.ToUInt16(right());
                     break;
 
                 case BinaryExpressionType.BitwiseXOr:
-                    Result = Convert.ToUInt16(left(), _cultureInfo) ^ Convert.ToUInt16(right());
+                    return (left, right) => Convert.ToUInt16(left(), _cultureInfo) ^ Convert.ToUInt16(right());
                     break;
 
                 case BinaryExpressionType.LeftShift:
-                    Result = Convert.ToUInt16(left(), _cultureInfo) << Convert.ToUInt16(right());
+                    return (left, right) => Convert.ToUInt16(left(), _cultureInfo) << Convert.ToUInt16(right());
                     break;
 
                 case BinaryExpressionType.RightShift:
-                    Result = Convert.ToUInt16(left(), _cultureInfo) >> Convert.ToUInt16(right());
+                    return (left, right) => Convert.ToUInt16(left(), _cultureInfo) >> Convert.ToUInt16(right());
                     break;
 
                 case BinaryExpressionType.Exponentiation:
-                    Result = Math.Pow(Convert.ToDouble(left(), _cultureInfo), Convert.ToDouble(right()));
+                    return (left, right) => Math.Pow(Convert.ToDouble(left(), _cultureInfo), Convert.ToDouble(right()));
                     break;
+
+                default:
+                    throw new NotSupportedException();
             }
         }
 
@@ -252,6 +268,13 @@ namespace NCalc.Domain
 
         public override void Visit(Function function)
         {
+            // Quickly reuse previous found definition
+            if (function.InternalDelegateFunction != null)
+            {
+                Result = function.InternalDelegateFunction(function);
+                return;
+            }
+
             var args = new FunctionArgs
             {
                 Parameters = new Expression[function.Expressions.Length]
@@ -271,7 +294,6 @@ namespace NCalc.Domain
                 // Assign the parameters of the Expression to the arguments so that custom Functions and Parameters can use them
                 args.Parameters[i].Parameters = Parameters;
             }
-
 
             if (!function.Resolved)
             {
@@ -299,7 +321,7 @@ namespace NCalc.Domain
             }
 
             // Try to find an internal function
-            var resolveInternalDelegateArg = new FunctionResolveArgs();
+            var resolveInternalDelegateArg = new InternalFunctionResolveArgs();
 
             if (function.InternalDelegateFunction == null)
             {
@@ -307,362 +329,380 @@ namespace NCalc.Domain
                 function.InternalDelegateFunction = resolveInternalDelegateArg.Delegate;
             }
 
-            function.InternalDelegateFunction(args);
-            Result = args.Result;
+            Result = function.InternalDelegateFunction(function);
 
             return;
-
         }
 
-        private void ResolveInternalFunction(Function function, FunctionResolveArgs fargs)
+        private void ResolveInternalFunction(Function func, InternalFunctionResolveArgs fargs)
         {
-
-            switch (function.Identifier.Name.ToLower())
+            switch (func.Identifier.Name.ToLower())
             {
                 #region Abs
+
                 case "abs":
 
-                    CheckCase("Abs", function.Identifier.Name);
+                    CheckCase("Abs", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Abs() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Abs(Convert.ToDecimal(
-                        Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo)
-                        );
+                    fargs.Delegate = (function) => Math.Abs(Convert.ToDecimal(
+                            Evaluate(function.Expressions[0]), _cultureInfo)
+                    );
 
                     break;
 
-                #endregion
+                #endregion Abs
 
                 #region Acos
+
                 case "acos":
 
-                    CheckCase("Acos", function.Identifier.Name);
+                    CheckCase("Acos", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Acos() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Acos(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Acos(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Acos
 
                 #region Asin
+
                 case "asin":
 
-                    CheckCase("Asin", function.Identifier.Name);
+                    CheckCase("Asin", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Asin() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Asin(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Asin(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Asin
 
                 #region Atan
+
                 case "atan":
 
-                    CheckCase("Atan", function.Identifier.Name);
+                    CheckCase("Atan", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Atan() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Atan(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Atan(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Atan
 
                 #region Ceiling
+
                 case "ceiling":
 
-                    CheckCase("Ceiling", function.Identifier.Name);
+                    CheckCase("Ceiling", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Ceiling() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Ceiling(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Ceiling(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Ceiling
 
                 #region Cos
 
                 case "cos":
 
-                    CheckCase("Cos", function.Identifier.Name);
+                    CheckCase("Cos", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Cos() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Cos(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Cos(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Cos
 
                 #region Exp
+
                 case "exp":
 
-                    CheckCase("Exp", function.Identifier.Name);
+                    CheckCase("Exp", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Exp() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Exp(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Exp(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Exp
 
                 #region Floor
+
                 case "floor":
 
-                    CheckCase("Floor", function.Identifier.Name);
+                    CheckCase("Floor", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Floor() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Floor(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Floor(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Floor
 
                 #region IEEERemainder
+
                 case "ieeeremainder":
 
-                    CheckCase("IEEERemainder", function.Identifier.Name);
+                    CheckCase("IEEERemainder", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("IEEERemainder() takes exactly 2 arguments");
 
-                    fargs.Delegate = (args) => args.Result = Math.IEEERemainder(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression)), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.IEEERemainder(Convert.ToDouble(Evaluate(function.Expressions[0])), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion IEEERemainder
 
                 #region Ln
+
                 case "ln":
 
-                    CheckCase("Ln", function.Identifier.Name);
+                    CheckCase("Ln", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Ln() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Log(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Log(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Ln
 
                 #region Log
+
                 case "log":
 
-                    CheckCase("Log", function.Identifier.Name);
+                    CheckCase("Log", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("Log() takes exactly 2 arguments");
 
-                    fargs.Delegate = (args) => args.Result = Math.Log(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Log(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Log
 
                 #region Log10
+
                 case "log10":
 
-                    CheckCase("Log10", function.Identifier.Name);
+                    CheckCase("Log10", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Log10() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Log10(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Log10(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Log10
 
                 #region Pow
+
                 case "pow":
 
-                    CheckCase("Pow", function.Identifier.Name);
+                    CheckCase("Pow", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("Pow() takes exactly 2 arguments");
 
-                    fargs.Delegate = (args) => args.Result = Math.Pow(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToDouble(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Pow(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToDouble(Evaluate(function.Expressions[1]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Pow
 
                 #region Round
+
                 case "round":
 
-                    CheckCase("Round", function.Identifier.Name);
+                    CheckCase("Round", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("Round() takes exactly 2 arguments");
 
                     MidpointRounding rounding = (_options & EvaluateOptions.RoundAwayFromZero) == EvaluateOptions.RoundAwayFromZero ? MidpointRounding.AwayFromZero : MidpointRounding.ToEven;
 
-                    fargs.Delegate = (args) => args.Result = Math.Round(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo), Convert.ToInt16(Evaluate(args.Parameters[1].ParsedExpression), _cultureInfo), rounding);
+                    fargs.Delegate = (function) => Math.Round(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo), Convert.ToInt16(Evaluate(function.Expressions[1]), _cultureInfo), rounding);
 
                     break;
 
-                #endregion
+                #endregion Round
 
                 #region Sign
+
                 case "sign":
 
-                    CheckCase("Sign", function.Identifier.Name);
+                    CheckCase("Sign", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Sign() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Sign(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Sign(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Sign
 
                 #region Sin
+
                 case "sin":
 
-                    CheckCase("Sin", function.Identifier.Name);
+                    CheckCase("Sin", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Sin() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Sin(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Sin(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Sin
 
                 #region Sqrt
+
                 case "sqrt":
 
-                    CheckCase("Sqrt", function.Identifier.Name);
+                    CheckCase("Sqrt", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Sqrt() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Sqrt(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Sqrt(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Sqrt
 
                 #region Tan
+
                 case "tan":
 
-                    CheckCase("Tan", function.Identifier.Name);
+                    CheckCase("Tan", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Tan() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Tan(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Tan(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Tan
 
                 #region Truncate
+
                 case "truncate":
 
-                    CheckCase("Truncate", function.Identifier.Name);
+                    CheckCase("Truncate", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 1)
+                    if (func.Expressions.Length != 1)
                         throw new ArgumentException("Truncate() takes exactly 1 argument");
 
-                    fargs.Delegate = (args) => args.Result = Math.Truncate(Convert.ToDouble(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo));
+                    fargs.Delegate = (function) => Math.Truncate(Convert.ToDouble(Evaluate(function.Expressions[0]), _cultureInfo));
 
                     break;
 
-                #endregion
+                #endregion Truncate
 
                 #region Max
+
                 case "max":
 
-                    CheckCase("Max", function.Identifier.Name);
+                    CheckCase("Max", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("Max() takes exactly 2 arguments");
 
-                    fargs.Delegate = (args) =>
+                    fargs.Delegate = (function) =>
                     {
-                        object maxleft = Evaluate(args.Parameters[0].ParsedExpression);
-                        object maxright = Evaluate(args.Parameters[1].ParsedExpression);
+                        object maxleft = Evaluate(function.Expressions[0]);
+                        object maxright = Evaluate(function.Expressions[1]);
 
-                        args.Result = Numbers.Max(maxleft, maxright);
+                        return Numbers.Max(maxleft, maxright);
                     };
                     break;
 
-                #endregion
+                #endregion Max
 
                 #region Min
+
                 case "min":
 
-                    CheckCase("Min", function.Identifier.Name);
+                    CheckCase("Min", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 2)
+                    if (func.Expressions.Length != 2)
                         throw new ArgumentException("Min() takes exactly 2 arguments");
 
-                    fargs.Delegate = (args) =>
+                    fargs.Delegate = (function) =>
                     {
-                        object minleft = Evaluate(args.Parameters[0].ParsedExpression);
-                        object minright = Evaluate(args.Parameters[1].ParsedExpression);
+                        object minleft = Evaluate(function.Expressions[0]);
+                        object minright = Evaluate(function.Expressions[1]);
 
-                        args.Result = Numbers.Min(minleft, minright);
+                        return Numbers.Min(minleft, minright);
                     };
                     break;
 
-                #endregion
+                #endregion Min
 
                 #region if
+
                 case "if":
 
-                    CheckCase("if", function.Identifier.Name);
+                    CheckCase("if", func.Identifier.Name);
 
-                    if (function.Expressions.Length != 3)
+                    if (func.Expressions.Length != 3)
                         throw new ArgumentException("if() takes exactly 3 arguments");
 
-                    fargs.Delegate = (args) =>
+                    fargs.Delegate = (function) =>
                     {
-                        bool cond = Convert.ToBoolean(Evaluate(args.Parameters[0].ParsedExpression), _cultureInfo);
-                        args.Result = cond ? Evaluate(args.Parameters[1].ParsedExpression) : Evaluate(args.Parameters[2].ParsedExpression);
+                        bool cond = Convert.ToBoolean(Evaluate(function.Expressions[0]), _cultureInfo);
+                        return cond ? Evaluate(function.Expressions[1]) : Evaluate(function.Expressions[2]);
                     };
                     break;
 
-                #endregion
+                #endregion if
 
                 #region in
+
                 case "in":
 
-                    CheckCase("in", function.Identifier.Name);
+                    CheckCase("in", func.Identifier.Name);
 
-                    if (function.Expressions.Length < 2)
+                    if (func.Expressions.Length < 2)
                         throw new ArgumentException("in() takes at least 2 arguments");
-
-                    fargs.Delegate = (args) =>
+                    fargs.Delegate = (function) =>
                     {
-                        object parameter = Evaluate(args.Parameters[0].ParsedExpression);
+                        object parameter = Evaluate(function.Expressions[0]);
 
                         bool evaluation = false;
 
                         // Goes through any values, and stop whe one is found
-                        for (int i = 1; i < function.Expressions.Length; i++)
+                        for (int i = 1; i < func.Expressions.Length; i++)
                         {
-                            object argument = Evaluate(args.Parameters[i].ParsedExpression);
+                            object argument = Evaluate(function.Expressions[i]);
                             if (CompareUsingMostPreciseType(parameter, argument) == 0)
                             {
                                 evaluation = true;
@@ -670,15 +710,15 @@ namespace NCalc.Domain
                             }
                         }
 
-                        args.Result = evaluation;
+                        return evaluation;
                     };
                     break;
 
-                #endregion
+                #endregion in
 
                 default:
                     throw new ArgumentException("Function not found",
-                        function.Identifier.Name);
+                        func.Identifier.Name);
             }
         }
 
@@ -701,6 +741,7 @@ namespace NCalc.Domain
         }
 
         public event EvaluateFunctionHandler EvaluateFunction;
+
         public event ResolveFunctionHandler ResolveFunction;
 
         private void OnEvaluateFunction(string name, FunctionArgs args)
@@ -725,7 +766,7 @@ namespace NCalc.Domain
                     // The parameter is itself another Expression
                     var expression = (Expression)Parameters[parameter.Name];
 
-                    // Overloads parameters 
+                    // Overloads parameters
                     foreach (var p in Parameters)
                     {
                         expression.Parameters[p.Key] = p.Value;
@@ -744,20 +785,20 @@ namespace NCalc.Domain
             }
             else
             {
-
-                if(parameter.Resolved == false)
+                if (parameter.ValueDelegate == null && ResolveParameter != null)
                 {
                     var resolveArgs = new ParameterResolveArgs();
 
                     OnResolveParameter(parameter.Name, resolveArgs);
                     parameter.ValueDelegate = resolveArgs.Result;
-                    parameter.Resolved = true;
                 }
-
                 if (parameter.ValueDelegate != null)
                 {
                     Result = parameter.ValueDelegate();
-                    return;
+                    if (Result != null)
+                    {
+                        return;
+                    }
                 }
 
                 // The parameter should be defined in a call back method
